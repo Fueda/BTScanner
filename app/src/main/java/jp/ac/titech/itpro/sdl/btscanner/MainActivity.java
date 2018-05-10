@@ -57,12 +57,11 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "onCreate");
         setContentView(R.layout.activity_main);
 
+        // bluetooth device list
         if (savedInstanceState != null)
             devList = savedInstanceState.getParcelableArrayList(KEY_DEVLIST);
         if (devList == null)
             devList = new ArrayList<>();
-
-        scanProgress = findViewById(R.id.scan_progress);
 
         devListAdapter = new ArrayAdapter<BluetoothDevice>(this, 0, devList) {
             @Override
@@ -75,14 +74,12 @@ public class MainActivity extends AppCompatActivity {
                 TextView nameView = view.findViewById(android.R.id.text1);
                 TextView addrView = view.findViewById(android.R.id.text2);
                 BluetoothDevice device = getItem(pos);
-                String name = null, bstat = null, addr = null;
                 if (device != null) {
-                    name = device.getName();
-                    bstat = device.getBondState() == BluetoothDevice.BOND_BONDED ? "*" : " ";
-                    addr = device.getAddress();
+                    nameView.setText(getString(R.string.format_dev_name,
+                            devName(device.getName()),
+                            device.getBondState() == BluetoothDevice.BOND_BONDED ? "*" : " "));
+                    addrView.setText(device.getAddress());
                 }
-                nameView.setText(getString(R.string.format_dev_name, name, bstat));
-                addrView.setText(addr);
                 return view;
             }
         };
@@ -94,16 +91,20 @@ public class MainActivity extends AppCompatActivity {
             public void onItemClick(AdapterView<?> parent, View view, int pos, long id) {
                 BluetoothDevice device = (BluetoothDevice) parent.getItemAtPosition(pos);
                 new AlertDialog.Builder(view.getContext())
-                        .setTitle(canonicalName(device.getName()))
+                        .setTitle(devName(device.getName()))
                         .setMessage(device.getAddress())
                         .setPositiveButton(android.R.string.ok, null)
                         .show();
             }
         });
 
+        // progress bar fo scanning
+        scanProgress = findViewById(R.id.scan_progress);
+
         btAdapter = BluetoothAdapter.getDefaultAdapter();
         if (btAdapter == null) {
-            Toast.makeText(this, getString(R.string.toast_bt_is_not_available), Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.toast_bt_is_not_available),
+                    Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
@@ -124,7 +125,8 @@ public class MainActivity extends AppCompatActivity {
                     invalidateOptionsMenu();
                     break;
                 case BluetoothDevice.ACTION_FOUND:
-                    BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                    BluetoothDevice device =
+                            intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                     if (devListAdapter.getPosition(device) < 0)
                         devListAdapter.add(device);
                     devListView.smoothScrollToPosition(devListAdapter.getCount());
@@ -206,6 +208,21 @@ public class MainActivity extends AppCompatActivity {
                     new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), REQCODE_ENABLE_BT);
     }
 
+    @Override
+    public void onActivityResult(int reqCode, int resCode, Intent data) {
+        Log.d(TAG, "onActivityResult");
+        switch (reqCode) {
+        case REQCODE_ENABLE_BT:
+            if (resCode != Activity.RESULT_OK) {
+                Toast.makeText(this, getString(R.string.toast_bt_must_be_enabled),
+                        Toast.LENGTH_SHORT).show();
+                finish();
+            }
+            break;
+        }
+        super.onActivityResult(reqCode, resCode, data);
+    }
+
     private void startScan() {
         Log.d(TAG, "startScan");
         for (String permission : PERMISSIONS) {
@@ -216,33 +233,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         startScan1();
-    }
-
-    private void startScan1() {
-        Log.d(TAG, "startScan1");
-        devListAdapter.clear();
-        if (btAdapter.isDiscovering())
-            btAdapter.cancelDiscovery();
-        btAdapter.startDiscovery();
-    }
-
-    private void stopScan() {
-        Log.d(TAG, "stopScan");
-        btAdapter.cancelDiscovery();
-    }
-
-    @Override
-    public void onActivityResult(int reqCode, int resCode, Intent data) {
-        Log.d(TAG, "onActivityResult");
-        switch (reqCode) {
-        case REQCODE_ENABLE_BT:
-            if (resCode != Activity.RESULT_OK) {
-                Toast.makeText(this, getString(R.string.toast_bt_must_be_enabled), Toast.LENGTH_SHORT).show();
-                finish();
-            }
-            break;
-        }
-        super.onActivityResult(reqCode, resCode, data);
     }
 
     @Override
@@ -264,7 +254,20 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private String canonicalName(String name) {
-        return name == null ? "(unnamed)" : name;
+    private void startScan1() {
+        Log.d(TAG, "startScan1");
+        devListAdapter.clear();
+        if (btAdapter.isDiscovering())
+            btAdapter.cancelDiscovery();
+        btAdapter.startDiscovery();
+    }
+
+    private void stopScan() {
+        Log.d(TAG, "stopScan");
+        btAdapter.cancelDiscovery();
+    }
+
+    private String devName(String name) {
+        return name == null ? "(no name)" : name;
     }
 }
